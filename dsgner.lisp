@@ -1,4 +1,13 @@
-(in-package :dsgner)
+(in-package #:common-lisp-user)
+
+(defpackage #:dsgner
+  (:use #:cl)
+  (:export #:empty-string
+	   #:deftag
+	   #:deftags
+	   #:with-indentation))
+
+(in-package #:dsgner)
 
 (defun empty-string ()
   (make-array '(0) 
@@ -6,36 +15,45 @@
               :fill-pointer 0
               :adjustable t))
 
+(defparameter *indent-enable* nil)
 
-(defparameter *indent-string* (let ((str (empty-string))
-				    (ch #\Space))
-				(dotimes (i 500) ;/ 500 2 = 250 levels max
-				  (vector-push-extend ch str))
-				str))
-
-(defparameter *indent-count* 2)
-(defparameter *indent-level* 0)
-
-(defun indent-space (level)
-  (format nil "~%~A" (subseq *indent-string* 0 (* level *indent-count*))))
-
-(defun indent-next-level ()
-  (incf *indent-level*)
-  (1- *indent-level*))
-
-(defun indent-start-over ()
-  (setf *indent-level* 0))
-
-(defun indent-count ()
-  *indent-count*)
+(let((indent-enable nil)
+     (indent-count 2)
+     (indent-level -1)
+     (indent-string (let ((str (empty-string))
+			  (ch #\Space))
+		      (dotimes (i 500) ;/ 500 2 = 250 levels max
+			(vector-push-extend ch str))
+		      str)))  
+  (defun indent-space (level)
+    (format nil "~%~A" (subseq indent-string 
+			       0 
+			       (* level indent-count))))
+  (defun indent-next-level ()
+    (incf indent-level))
+  (defun indent-start-over ()
+    (setf indent-level -1))
+  (defun indent-count ()
+    indent-count)
+  (defun indent-enable? ()
+    indent-enable)
+  (defun indent-enable ()
+    (setf indent-enable t))
+  (defun indent-disable ()
+    (setf indent-enable nil))
+  
+  "Indentation Support")
 
 (defmacro nif (test then &optional else)
   `(if (not ,test)
        ,then
        ,else))
 
-(defun format-tag (stream tag attributes)
-  (let ((output (format stream "<~A" tag)))
+(defun format-tag (stream tag attributes &optional (level 0))
+  (let* ((indent-str (indent-space level))
+	 (output (nif (zerop level)
+		      (format stream "~A<~A" indent-str tag)
+		      (format stream "<~A" tag))))
     (when attributes
       (do ((i 0 (+ i 2))
            (att attributes (cddr att))
@@ -53,7 +71,10 @@
   (let ((strsym (gensym))
 	(attsym (gensym))
 	(tagsym (gensym))
-	(tag-name (string-downcase (string tag))))
+	(tag-name (string-downcase (string tag)))
+	(indent-number (if (indent-enable?) 
+			   (indent-next-level)
+			   0)))
     `(let (,@(nif (null attributes)
 		  (list `(,attsym ',attributes)))
 	   (,strsym (empty-string)))
@@ -61,22 +82,33 @@
        (with-output-to-string (,tagsym ,strsym)
          ;;handle attributes
          ,(nif (null attributes)
-	       `(format-tag ,tagsym ,tag-name ,attsym)
-	       `(format-tag ,tagsym ,tag-name nil))
+	       `(format-tag ,tagsym ,tag-name ,attsym ,indent-number)
+	       `(format-tag ,tagsym ,tag-name nil ,indent-number))
 	 
 	 ;;handle BODY part
 	 ,@(cond ((null body)
 		  (list `(format ,tagsym " />")))
+
 		 ((and (= (length body) 1)
 		       (atom (car body)))
 		  (list `(format ,tagsym ">~A" ,(car body))
 			`(format ,tagsym "</~A>" ,tag-name)))
-		 (t (append (list `(format ,tagsym ">")) 
+				  
+		 (t (append (list `(format ,tagsym ">"))
 			    (mapcar #'(lambda (f) 
 					`(format ,tagsym "~A" ,f))
 				    body)
 			    (list `(format ,tagsym "</~A>" ,tag-name))))))
        ,strsym)))
+
+(defmacro with-indentation (&body body)
+  (let ((outsym (gensym)))
+    (indent-enable)
+    (indent-start-over)
+    `(let ((,outsym (progn
+		      ,@body)))
+       (indent-disable)
+       ,outsym)))
 
 (defmacro deftag (tag)
   `(defmacro ,tag ((&rest attribs) &body body)
@@ -100,29 +132,3 @@
 	 :option :p :param :pre :q :s :samp :script :select :small :span 
 	 :strike :strong :style :sub :sup :table :tbody :td :textarea :tfoot
 	 :th :thead :title :tr :tt :u :ul :var :xmp)
-
-
-(defun test1 ()
-  (:div (:class "x-tree-root-node-ct")
-	(:li (:class "x-tree-root-node")
-	     (:div ())
-	     (:ul ()
-		  (:li ()
-		       (:img (:src "icons/xxx.png")))))))
-
-(defun test2 ()
-  (:html (:xmlns "http://www.w3.org/1999/xhtml"
-		 :xml\:lang "en")
-	 (:head ()
-		(:meta (:http-equiv "Content-Type"
-				    :content "text/html;charset=utf-8"))
-		(:title ()
-			"Web Page")
-		(:link (:type "text/css"
-			      :rel "stylesheet"
-			      :href "/general.css")))
-	 (:body ()
-		(:div (:id "header")
-		      (:p ()
-			  (:h1 ()
-			       "HEADER..."))))))
