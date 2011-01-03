@@ -2,10 +2,7 @@
 
 (defpackage #:dsgner
   (:use #:cl)
-  (:export #:empty-string
-	   #:deftag
-	   #:deftags
-	   #:with-indentation))
+  (:export #:empty-string))
 
 (in-package #:dsgner)
 
@@ -89,16 +86,12 @@
 	 ,@(cond ((null body)
 		  (list `(format ,tagsym " />")))
 
-		 ((and (= (length body) 1)
-		       (atom (car body)))
-		  (list `(format ,tagsym ">~A" ,(car body))
-			`(format ,tagsym "</~A>" ,tag-name)))
-				  
-		 (t (append (list `(format ,tagsym ">"))
-			    (mapcar #'(lambda (f) 
-					`(format ,tagsym "~A" ,f))
-				    body)
-			    (list `(format ,tagsym "</~A>" ,tag-name))))))
+		 (t 
+		  (append (list `(format ,tagsym ">"))
+			  (mapcar #'(lambda (f) 
+				      `(format ,tagsym "~A" ,f))
+				  body)
+			  (list `(format ,tagsym "</~A>" ,tag-name))))))
        ,strsym)))
 
 (defmacro with-indentation (&body body)
@@ -121,14 +114,3 @@
      ,@(mapcar #'(lambda(tag)
                    `(deftag ,tag))
                tags)))
-
-;;define tags of HTML 4.01 / XHTML 1.0
-(deftags :!DOCTYPE :a :abbr :acronym :address :applet :b :base :basefont 
-	 :bdo :big :blockquote :body :br :button :caption :center :cite 
-	 :code :col :colgroup :dd :del :dfn :dir :div :dl :dt :em :fieldset 
-	 :font :form :frame :frameset :h1 :h2 :h3 :h4 :h5 :h6 :head :hr
-	 :html :i :iframe :img :input :ins :isindex :kbd :label :legend :li 
-	 :link :map :menu :meta :noframes :noscript :object :ol :optgroup
-	 :option :p :param :pre :q :s :samp :script :select :small :span 
-	 :strike :strong :style :sub :sup :table :tbody :td :textarea :tfoot
-	 :th :thead :title :tr :tt :u :ul :var :xmp)
