@@ -12,45 +12,13 @@
               :fill-pointer 0
               :adjustable t))
 
-(defparameter *indent-enable* nil)
-
-(let((indent-enable nil)
-     (indent-count 2)
-     (indent-level -1)
-     (indent-string (let ((str (empty-string))
-			  (ch #\Space))
-		      (dotimes (i 500) ;/ 500 2 = 250 levels max
-			(vector-push-extend ch str))
-		      str)))  
-  (defun indent-space (level)
-    (format nil "~%~A" (subseq indent-string 
-			       0 
-			       (* level indent-count))))
-  (defun indent-next-level ()
-    (incf indent-level))
-  (defun indent-start-over ()
-    (setf indent-level -1))
-  (defun indent-count ()
-    indent-count)
-  (defun indent-enable? ()
-    indent-enable)
-  (defun indent-enable ()
-    (setf indent-enable t))
-  (defun indent-disable ()
-    (setf indent-enable nil))
-  
-  "Indentation Support")
-
 (defmacro nif (test then &optional else)
   `(if (not ,test)
        ,then
        ,else))
 
-(defun format-tag (stream tag attributes &optional (level 0))
-  (let* ((indent-str (indent-space level))
-	 (output (nif (zerop level)
-		      (format stream "~A<~A" indent-str tag)
-		      (format stream "<~A" tag))))
+(defun format-tag (stream tag attributes)
+  (let ((output (format stream "<~A" tag)))
     (when attributes
       (do ((i 0 (+ i 2))
            (att attributes (cddr att))
@@ -79,8 +47,8 @@
        (with-output-to-string (,tagsym ,strsym)
          ;;handle attributes
          ,(nif (null attributes)
-	       `(format-tag ,tagsym ,tag-name ,attsym ,indent-number)
-	       `(format-tag ,tagsym ,tag-name nil ,indent-number))
+	       `(format-tag ,tagsym ,tag-name ,attsym)
+	       `(format-tag ,tagsym ,tag-name nil))
 	 
 	 ;;handle BODY part
 	 ,@(cond ((null body)
@@ -93,15 +61,6 @@
 				  body)
 			  (list `(format ,tagsym "</~A>" ,tag-name))))))
        ,strsym)))
-
-(defmacro with-indentation (&body body)
-  (let ((outsym (gensym)))
-    (indent-enable)
-    (indent-start-over)
-    `(let ((,outsym (progn
-		      ,@body)))
-       (indent-disable)
-       ,outsym)))
 
 (defmacro deftag (tag)
   `(defmacro ,tag ((&rest attribs) &body body)
