@@ -1,10 +1,12 @@
-(in-package #:common-lisp-user)
+(in-package :common-lisp-user)
 
-(defpackage #:dsgner
+(defpackage :dsgner
   (:use #:cl)
-  (:export #:empty-string))
+  (:export #:empty-string
+	   #:deftag
+	   #:deftags))
 
-(in-package #:dsgner)
+(in-package :dsgner)
 
 (defun empty-string ()
   (make-array '(0) 
@@ -36,10 +38,7 @@
   (let ((strsym (gensym))
 	(attsym (gensym))
 	(tagsym (gensym))
-	(tag-name (string-downcase (string tag)))
-	(indent-number (if (indent-enable?) 
-			   (indent-next-level)
-			   0)))
+	(tag-name (string-downcase (string tag))))
     `(let (,@(nif (null attributes)
 		  (list `(,attsym ',attributes)))
 	   (,strsym (empty-string)))
