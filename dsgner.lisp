@@ -19,47 +19,69 @@
        ,then
        ,else))
 
-(defun format-tag (stream tag attributes)
-  (let ((output (format stream "<~A" tag)))
-    (when attributes
-      (do ((i 0 (+ i 2))
-           (att attributes (cddr att))
-           (len (length attributes)))
-          ((>= i len))
-        (concatenate 'string 
-                     output
-                     (format stream
-                             " ~A=\"~A\""
-                             (string-downcase (string (car att)))
-                             (cadr att)))))
-    output))
-      
+(defmacro format-tag (stream tag &rest attributes)
+  (let ((alen (length attributes))
+	(fs "")
+	(acount 0))
+    (do ((i 0 (+ i 2)))
+	((>= i alen))
+      (setf fs (concatenate 'string 
+			    fs 
+			    (format nil "~A" " ~A=\"~A\""))))
+    `(format ,stream ,(format nil "<~A~A" "~A" fs)
+	     ,tag
+	     ,@(mapcar #'(lambda(a)
+			   (incf acount)
+			   (if (zerop (mod acount 2))
+			       a
+			       (string-downcase (string a))))
+		       attributes))))
+
+
+;;this is used in order not to use
+;;with-output-to-string macro more than once 
+(defun dscanner ()
+  (let ((depth 0))    
+    (values 
+     ;;returns depth
+     (lambda ()
+       depth)
+     
+     ;;incf depth
+     (lambda()
+       (incf depth))
+     
+     ;;decf depth
+     (lambda()
+       (decf depth)))))
+
+
 (defmacro with-use-tag ((tag) (&rest attributes) &body body)
   (let ((strsym (gensym))
-	(attsym (gensym))
 	(tagsym (gensym))
 	(tag-name (string-downcase (string tag))))
-    `(let (,@(nif (null attributes)
-		  (list `(,attsym ',attributes)))
-	   (,strsym (empty-string)))
-
-       (with-output-to-string (,tagsym ,strsym)
-         ;;handle attributes
-         ,(nif (null attributes)
-	       `(format-tag ,tagsym ,tag-name ,attsym)
-	       `(format-tag ,tagsym ,tag-name nil))
-	 
-	 ;;handle BODY part
-	 ,@(cond ((null body)
-		  (list `(format ,tagsym " />")))
-
-		 (t 
-		  (append (list `(format ,tagsym ">"))
-			  (mapcar #'(lambda (f) 
-				      `(format ,tagsym "~A" ,f))
-				  body)
-			  (list `(format ,tagsym "</~A>" ,tag-name))))))
-       ,strsym)))
+    (let ((base-list 
+	    (append 
+	       ;;handle attributes
+	       (nif (null attributes)
+		    (list `(format-tag ,tagsym ,tag-name ,@attributes))
+		    (list `(format-tag ,tagsym ,tag-name)))
+	       
+	       ;;handle BODY part
+	       (cond ((null body)
+		      (list `(format ,tagsym " />")))
+		     
+		     (t 
+		      (append (list `(format ,tagsym ">"))
+			      (mapcar #'(lambda (f) 
+					  `(format ,tagsym "~A" ,f))
+				      body)
+			      (list `(format ,tagsym "</~A>" ,tag-name))))))))
+      
+      `(let ((,strsym (empty-string)))
+	 (with-output-to-string (,tagsym ,strsym)
+	   ,@base-list)
+	 ,strsym))))
 
 (defmacro deftag (tag)
   `(defmacro ,tag ((&rest attribs) &body body)
