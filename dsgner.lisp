@@ -57,31 +57,34 @@
 
 
 (defmacro with-use-tag ((tag) (&rest attributes) &body body)
-  (let ((strsym (gensym))
-	(tagsym (gensym))
+  (let ((fsym (gensym))
 	(tag-name (string-downcase (string tag))))
     (let ((base-list 
-	    (append 
-	       ;;handle attributes
-	       (nif (null attributes)
-		    (list `(format-tag ,tagsym ,tag-name ,@attributes))
-		    (list `(format-tag ,tagsym ,tag-name)))
-	       
-	       ;;handle BODY part
-	       (cond ((null body)
-		      (list `(format ,tagsym " />")))
-		     
-		     (t 
-		      (append (list `(format ,tagsym ">"))
-			      (mapcar #'(lambda (f) 
-					  `(format ,tagsym "~A" ,f))
-				      body)
-			      (list `(format ,tagsym "</~A>" ,tag-name))))))))
+	   (append 
+	    ;;handle attributes
+	    (nif (null attributes)
+		 (list `(format-tag !!tag-stream!! ,tag-name ,@attributes))
+		 (list `(format-tag !!tag-stream!! ,tag-name)))
+	    
+	    ;;handle BODY part
+	    (cond ((null body)
+		   (list `(format !!tag-stream!! " />")))
+		  
+		  (t 
+		   (append (list `(format !!tag-stream!! ">"))
+			   (mapcar #'(lambda (f) 
+				       `(format !!tag-stream!! "~A" ,f))
+				   body)
+			   (list `(format !!tag-stream!! "</~A>" ,tag-name))))))))
       
-      `(let ((,strsym (empty-string)))
-	 (with-output-to-string (,tagsym ,strsym)
-	   ,@base-list)
-	 ,strsym))))
+      `(flet ((,fsym (!!tag-stream!!)
+		,@base-list))
+	 (nif (boundp '!!empty-string!!)
+	      (let ((!!empty-string!! (empty-string)))
+		(with-output-to-string (!!tag-stream!! !!empty-string!!)
+		  (,fsym !!tag-stream!!))
+		!!empty-string!!)
+	      (,fsym !!tag-stream!!))))))
 
 (defmacro deftag (tag)
   `(defmacro ,tag ((&rest attribs) &body body)
